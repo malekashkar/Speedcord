@@ -3,16 +3,18 @@ import { CarModel } from "../models/car";
 import { Message, TextChannel } from "discord.js";
 import { createSignupProcess } from "../utils/signup";
 import { GameModel } from "../models/game";
-import { RacerModel } from "../models/racer";
+import { Racer, RacerModel } from "../models/racer";
 import embeds from "../utils/embeds";
-import { playGame, searchForGame } from "../utils/gameFunction";
-import { sleep } from "../utils/";
+import { playGame, searchForGame, joinRace } from "../utils/gameFunction";
+import { sleep } from "../utils";
 import cars from "../cars";
+import Configuration from "../config";
 
 export default class PlayCommand extends Command {
-  cmdName = "play";
+  cmdName = "race";
   description =
     "Enter a public race against oponents and possibly take home a victory!";
+  aliases = ["play"];
 
   async run(message: Message) {
     const started = await CarModel.findOne({
@@ -49,6 +51,12 @@ export default class PlayCommand extends Command {
     });
 
     const carDetails = cars.find((x) => x.carId === racerProfile.selectedCarId);
+    if (!carDetails)
+      return loadingMesage.edit(
+        embeds.error(
+          `Please select a car from your garage with the \`${Configuration.prefix}select\` command!`
+        )
+      );
 
     const raceGame = await searchForGame(message.author, racerProfile);
     if (raceGame) {
@@ -60,23 +68,25 @@ export default class PlayCommand extends Command {
         )
       );
 
+      raceGame.status = "STARTED";
+      await raceGame.save();
+
       raceGame.userTwo = {
         racerId: message.author.id,
         racerExperience: racerProfile.experience,
-        racerDisplayName: racerProfile.displayName,
+        racerDisplayName: racerProfile.displayName || racerProfile.username,
         carBaseSpeed: carDetails.baseSpeed,
         carName: carDetails.carName,
       };
-      await raceGame.save();
 
-      return playGame(this.client, raceGame);
+      return joinRace(message.channel as TextChannel, this.client, raceGame);
     } else {
       await GameModel.create({
         createdAt: new Date(),
         userOne: {
           racerId: message.author.id,
           racerExperience: racerProfile.experience,
-          racerDisplayName: racerProfile.displayName,
+          racerDisplayName: racerProfile.displayName || racerProfile.username,
           carBaseSpeed: carDetails.baseSpeed,
           carName: carDetails.carName,
         },

@@ -6,6 +6,8 @@ export interface Car {
   price: number;
 }
 
+// Car names can't be longer than 27 characters
+
 const cars: Car[] = [
   {
     carId: 0,

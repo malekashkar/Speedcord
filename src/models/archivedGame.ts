@@ -1,7 +1,7 @@
-import { prop } from "@typegoose/typegoose";
+import { getModelForClass, prop } from "@typegoose/typegoose";
 import { RacerState } from "./game";
 
-export class Game {
+export class ArchivedGame {
   @prop({ type: RacerState })
   userOne: RacerState;
 
@@ -16,3 +16,5 @@ export class Game {
     }
   }
 }
+
+export const ArchivedGameModel = getModelForClass(ArchivedGame);

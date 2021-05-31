@@ -1,6 +1,7 @@
-import { getModelForClass, Prop, prop } from "@typegoose/typegoose";
+import { getModelForClass, prop } from "@typegoose/typegoose";
 
 export type Status = "CREATED" | "STARTED";
+export type Type = "CASUAL" | "COMPETITIVE" | "PRIVATE";
 
 export class RacerState {
   @prop()
@@ -18,6 +19,9 @@ export class RacerState {
   @prop()
   carName: string;
 
+  @prop()
+  messageId?: string;
+
   @prop({ default: 0 })
   horsepowerCompleted?: number;
 
@@ -28,7 +32,7 @@ export class RacerState {
 export class Game {
   @prop()
   createdAt: Date;
-  
+
   @prop({ default: "CREATED" })
   status?: Status;
 

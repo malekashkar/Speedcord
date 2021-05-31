@@ -47,45 +47,104 @@ export default class embeds {
     return new MessageEmbed().setColor(config.color);
   };
 
+  static start = function () {
+    return embeds.error(
+      `Please run the \`${config.prefix}race\` command before other game commands!`,
+      `Begin Playing`
+    );
+  };
+
   static race = function (userOneState: RacerState, userTwoState: RacerState) {
-    const userOneLeftDashLines = Math.round(
-      (userOneState.horsepowerCompleted /
-        Configuration.gameConfiguration.totalRaceHorsepower) *
-        10
-    );
+    const userOneLeftDashLines =
+      Math.round(
+        (userOneState.horsepowerCompleted /
+          Configuration.gameConfiguration.totalRaceHorsepower) *
+          10
+      ) * 2;
 
-    const userTwoLeftDashLines = Math.round(
-      (userTwoState.horsepowerCompleted /
-        Configuration.gameConfiguration.totalRaceHorsepower) *
-        10
-    );
+    const userTwoLeftDashLines =
+      Math.round(
+        (userTwoState.horsepowerCompleted /
+          Configuration.gameConfiguration.totalRaceHorsepower) *
+          10
+      ) * 2;
 
-    const userOneRightDashLines = 10 - userOneLeftDashLines;
-    const userTwoRightDashLines = 10 - userTwoLeftDashLines;
-
-    return new MessageEmbed()
+    const gameEmbed = new MessageEmbed()
       .setColor(config.color)
       .addField(
-        `${userOneState.racerDisplayName} ~ **${userOneState.carName}**`,
-        stripIndents`\`_____________________\`
-      :checkered_flag:${
-        userOneRightDashLines ? `\`${`=`.repeat(userOneRightDashLines)}\`` : ``
-      }:red_car:${
-          userOneLeftDashLines ? `\`${`=`.repeat(userOneLeftDashLines)}\`` : ``
-        }
-      \`_____________________\``,
+        `${userOneState.racerDisplayName}`,
+        stripIndents`**${userOneState.carName}**` +
+          `\n\`__________________________\`` +
+          `\n:checkered_flag:` +
+          `${
+            20 - userOneLeftDashLines
+              ? `\`${`=`.repeat(20 - userOneLeftDashLines)}\``
+              : ``
+          }` +
+          `:red_car:` +
+          `${
+            userOneLeftDashLines
+              ? `\`${`=`.repeat(userOneLeftDashLines)}\``
+              : ``
+          }` +
+          ` \n\`__________________________\``,
         true
       )
       .addField(
-        `${userTwoState.racerDisplayName} ~ **${userTwoState.carName}**`,
-        stripIndents`\`_____________________\`
-      :checkered_flag:${
-        userTwoRightDashLines ? `\`${`=`.repeat(userTwoRightDashLines)}\`` : ``
-      }:blue_car:${
-          userTwoLeftDashLines ? `\`${`=`.repeat(userTwoLeftDashLines)}\`` : ``
-        }
-      \`_____________________\``,
+        `${userTwoState.racerDisplayName}`,
+        stripIndents`**${userTwoState.carName}**` +
+          `\n\`__________________________\`` +
+          `\n:checkered_flag:` +
+          `${
+            20 - userTwoLeftDashLines
+              ? `\`${`=`.repeat(20 - userTwoLeftDashLines)}\``
+              : ``
+          }` +
+          `:blue_car:` +
+          `${
+            userTwoLeftDashLines
+              ? `\`${`=`.repeat(userTwoLeftDashLines)}\``
+              : ``
+          }` +
+          ` \n\`__________________________\``,
         true
       );
+
+    if (
+      userOneState.horsepowerCompleted >=
+        Configuration.gameConfiguration.totalRaceHorsepower &&
+      userTwoState.horsepowerCompleted >=
+        Configuration.gameConfiguration.totalRaceHorsepower
+    ) {
+      if (userOneState.ticksTaken < userTwoState.ticksTaken) {
+        return gameEmbed.setDescription(
+          `:tada: The race ended with a win in **${userOneState.racerDisplayName}'s** favor.`
+        );
+      } else if (userOneState.ticksTaken > userTwoState.ticksTaken) {
+        return gameEmbed.setDescription(
+          `:tada: The race ended with a win in **${userTwoState.racerDisplayName}'s** favor.`
+        );
+      } else {
+        return gameEmbed.setDescription(
+          `:tada: The race ended in a tie between **${userOneState.racerDisplayName}** and **${userTwoState.racerDisplayName}**.`
+        );
+      }
+    } else if (
+      userOneState.horsepowerCompleted >=
+      Configuration.gameConfiguration.totalRaceHorsepower
+    ) {
+      return gameEmbed.setDescription(
+        `:tada: The race ended with a win in **${userOneState.racerDisplayName}'s** favor.`
+      );
+    } else if (
+      userTwoState.horsepowerCompleted >=
+      Configuration.gameConfiguration.totalRaceHorsepower
+    ) {
+      return gameEmbed.setDescription(
+        `:tada: The race ended with a win in **${userTwoState.racerDisplayName}'s** favor.`
+      );
+    } else {
+      return gameEmbed;
+    }
   };
 }
