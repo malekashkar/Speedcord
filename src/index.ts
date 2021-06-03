@@ -8,11 +8,13 @@ import fs from "fs";
 import Event from "./events";
 import Command from "./commands";
 import Logger from "./utils/logger";
+import { Games } from "./utils/game";
 
 dotenv();
 
 export default class Client extends DiscordClient {
   commands: Collection<string, Command> = new Collection();
+  races: Games[] = [];
 
   constructor(options?: ClientOptions) {
     super({

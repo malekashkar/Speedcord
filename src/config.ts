@@ -1,4 +1,4 @@
-export interface Configuration {
+export interface config {
   prefix: string;
   color: string;
   questionTime: number;
@@ -12,7 +12,7 @@ export interface Configuration {
   numberEmojis: string[];
 }
 
-const Configuration = {
+export default {
   prefix: "/",
   color: "#48f52a",
   questionTime: 30 * 1000,
@@ -24,6 +24,4 @@ const Configuration = {
   },
 
   numberEmojis: ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"],
-} as Configuration;
-
-export default Configuration;
+} as config;
