@@ -1,9 +1,8 @@
-import { MessageEmbed } from "discord.js";
-import config from "../config";
 import ms from "ms";
+import { MessageEmbed } from "discord.js";
 import { stripIndents } from "common-tags";
 import { RacerState } from "../models/game";
-import Configuration from "../config";
+import config from "../config";
 
 export default class embeds {
   static error = function (error: string, title = "Error Caught") {
@@ -58,14 +57,14 @@ export default class embeds {
     const userOneLeftDashLines =
       Math.round(
         (userOneState.horsepowerCompleted /
-          Configuration.gameConfiguration.totalRaceHorsepower) *
+          config.gameConfiguration.totalRaceHorsepower) *
           10
       ) * 2;
 
     const userTwoLeftDashLines =
       Math.round(
         (userTwoState.horsepowerCompleted /
-          Configuration.gameConfiguration.totalRaceHorsepower) *
+          config.gameConfiguration.totalRaceHorsepower) *
           10
       ) * 2;
 
@@ -112,9 +111,9 @@ export default class embeds {
 
     if (
       userOneState.horsepowerCompleted >=
-        Configuration.gameConfiguration.totalRaceHorsepower &&
+        config.gameConfiguration.totalRaceHorsepower &&
       userTwoState.horsepowerCompleted >=
-        Configuration.gameConfiguration.totalRaceHorsepower
+        config.gameConfiguration.totalRaceHorsepower
     ) {
       if (userOneState.ticksTaken < userTwoState.ticksTaken) {
         return gameEmbed.setDescription(
@@ -131,14 +130,14 @@ export default class embeds {
       }
     } else if (
       userOneState.horsepowerCompleted >=
-      Configuration.gameConfiguration.totalRaceHorsepower
+      config.gameConfiguration.totalRaceHorsepower
     ) {
       return gameEmbed.setDescription(
         `:tada: The race ended with a win in **${userOneState.racerDisplayName}'s** favor.`
       );
     } else if (
       userTwoState.horsepowerCompleted >=
-      Configuration.gameConfiguration.totalRaceHorsepower
+      config.gameConfiguration.totalRaceHorsepower
     ) {
       return gameEmbed.setDescription(
         `:tada: The race ended with a win in **${userTwoState.racerDisplayName}'s** favor.`

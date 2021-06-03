@@ -2,7 +2,7 @@ import { replaceStringTransformer } from "common-tags";
 import { Message } from "discord.js";
 import Command from ".";
 import cars from "../cars";
-import Configuration from "../config";
+import config from "../config";
 import { CarModel } from "../models/car";
 import { GameModel } from "../models/game";
 import { RacerModel } from "../models/racer";
@@ -33,7 +33,7 @@ export default class SelectCommand extends Command {
     if (carIndex === null)
       return message.channel.send(
         embeds.error(
-          `Please provide the ID of the car you would like to select. To check what cars you have available, use the \`${Configuration.prefix}garage\` command!`
+          `Please provide the ID of the car you would like to select. To check what cars you have available, use the \`${config.prefix}garage\` command!`
         )
       );
 

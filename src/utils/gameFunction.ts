@@ -1,7 +1,8 @@
 import { DocumentType } from "@typegoose/typegoose";
-import { Message, TextChannel, User } from "discord.js";
+import { TextChannel, User } from "discord.js";
+import { commafy } from ".";
 import Client from "..";
-import Configuration from "../config";
+import config from "../config";
 import { ArchivedGameModel } from "../models/archivedGame";
 import { Game, GameModel } from "../models/game";
 import { Racer, RacerModel } from "../models/racer";
@@ -19,10 +20,10 @@ export async function searchForGame(
       "userOne.racerExperience": {
         $gte:
           racerProfile.experience -
-          Configuration.gameConfiguration.queueExperienceDiversion,
+          config.gameConfiguration.queueExperienceDiversion,
         $lte:
           racerProfile.experience +
-          Configuration.gameConfiguration.queueExperienceDiversion,
+          config.gameConfiguration.queueExperienceDiversion,
       },
       userTwo: { $exists: false },
     });
@@ -76,6 +77,22 @@ export async function joinRace(
 
 export async function playGame(client: Client, game: DocumentType<Game>) {
   try {
+    const userOneGearShifts = Math.round(
+      ((config.gameConfiguration.totalRaceHorsepower /
+        game.userOne.carBaseSpeed) *
+        5) /
+        6 /
+        6
+    );
+
+    const userTwoGearShifts = Math.round(
+      ((config.gameConfiguration.totalRaceHorsepower /
+        game.userTwo.carBaseSpeed) *
+        5) /
+        6 /
+        6
+    );
+
     const ticksPerUpdate = 5;
     const userOne = await client.users.fetch(game.userOne.racerId);
     const userTwo = await client.users.fetch(game.userTwo.racerId);
@@ -92,7 +109,7 @@ export async function playGame(client: Client, game: DocumentType<Game>) {
       for (let i = 1; i <= ticksPerUpdate; i++) {
         if (
           game.userOne.horsepowerCompleted <
-          Configuration.gameConfiguration.totalRaceHorsepower
+          config.gameConfiguration.totalRaceHorsepower
         ) {
           game.userOne.ticksTaken += 1;
           game.userOne.horsepowerCompleted += game.userOne.carBaseSpeed;
@@ -100,7 +117,7 @@ export async function playGame(client: Client, game: DocumentType<Game>) {
 
         if (
           game.userTwo.horsepowerCompleted <
-          Configuration.gameConfiguration.totalRaceHorsepower
+          config.gameConfiguration.totalRaceHorsepower
         ) {
           game.userTwo.ticksTaken += 1;
           game.userTwo.horsepowerCompleted += game.userTwo.carBaseSpeed;
@@ -108,9 +125,9 @@ export async function playGame(client: Client, game: DocumentType<Game>) {
 
         if (
           game.userOne.horsepowerCompleted >=
-            Configuration.gameConfiguration.totalRaceHorsepower ||
+            config.gameConfiguration.totalRaceHorsepower ||
           (game.userTwo.horsepowerCompleted >=
-            Configuration.gameConfiguration.totalRaceHorsepower &&
+            config.gameConfiguration.totalRaceHorsepower &&
             !someoneWon)
         ) {
           // Someone won the race
@@ -121,9 +138,9 @@ export async function playGame(client: Client, game: DocumentType<Game>) {
 
         if (
           game.userOne.horsepowerCompleted >=
-            Configuration.gameConfiguration.totalRaceHorsepower &&
+            config.gameConfiguration.totalRaceHorsepower &&
           game.userTwo.horsepowerCompleted >=
-            Configuration.gameConfiguration.totalRaceHorsepower &&
+            config.gameConfiguration.totalRaceHorsepower &&
           someoneWon
         ) {
           // Game completely ended, move to archived
@@ -162,54 +179,102 @@ export async function endTheRace(client: Client, game: DocumentType<Game>) {
     });
     await game.deleteOne();
 
-    const loserData =
-      game.userOne.ticksTaken < game.userTwo.ticksTaken
-        ? game.userTwo
-        : game.userOne;
-    const winnerData =
-      game.userOne.ticksTaken < game.userTwo.ticksTaken
-        ? game.userOne
-        : game.userTwo;
+    if (game.userOne.ticksTaken === game.userTwo.ticksTaken) {
+    } else {
+      // Winner Information
+      const winnerData =
+        game.userOne.ticksTaken < game.userTwo.ticksTaken
+          ? game.userOne
+          : game.userTwo;
 
-    const creditsWon = 1000;
-    const experienceWon = 5000;
+      const winnerCredits = Math.round(
+        config.gameConfiguration.coinsWinDefault -
+          winnerData.ticksTaken * 8
+      );
+      const winnerExperience = Math.round(
+        config.gameConfiguration.experienceWinDefault -
+          winnerData.ticksTaken * 40
+      );
 
-    const winnerProfile = await RacerModel.findOne({
-      userId: winnerData.racerId,
-    });
-    if (winnerProfile) {
-      winnerProfile.credits += creditsWon;
-      winnerProfile.experience += experienceWon;
-      await winnerProfile.save();
+      const winnerProfile = await RacerModel.findOne({
+        userId: winnerData.racerId,
+      });
+      if (winnerProfile) {
+        winnerProfile.credits += winnerCredits;
+        winnerProfile.experience += winnerExperience;
+        await winnerProfile.save();
+      }
+
+      // Loser Information
+      const loserData =
+        game.userOne.ticksTaken < game.userTwo.ticksTaken
+          ? game.userTwo
+          : game.userOne;
+
+      const loserCredits = Math.round(
+        config.gameConfiguration.coinsLossDefault -
+          loserData.ticksTaken * 0.9
+      );
+      const loserExperience = Math.round(
+        config.gameConfiguration.experienceLossDefault -
+          loserData.ticksTaken * 9
+      );
+
+      const loserProfile = await RacerModel.findOne({
+        userId: loserData.racerId,
+      });
+      if (loserProfile) {
+        loserProfile.credits += loserCredits;
+        loserProfile.experience += loserExperience;
+        await loserProfile.save();
+      }
+
+      // Winner Message
+      const winnerUser = await client.users.fetch(winnerData.racerId);
+      const winnerMessage = await winnerUser.dmChannel.messages.fetch(
+        winnerData.messageId
+      );
+      winnerMessage.edit(
+        embeds
+          .race(game.userOne, game.userTwo)
+          .setTitle(`Race Won`)
+          .setDescription(
+            `🎉 You beat **${loserData.racerDisplayName}** by \`${
+              loserData.ticksTaken - winnerData.ticksTaken
+            }\` seconds.`
+          )
+          .addField(
+            `Rewards`,
+            `**Credits** $${commafy(winnerCredits)}
+          **Experience** ${commafy(winnerExperience)}`,
+            true
+          )
+      );
+
+      // Loser Message
+      const loserUser = await client.users.fetch(loserData.racerId);
+      const loserMessage = await loserUser.dmChannel.messages.fetch(
+        loserData.messageId
+      );
+      loserMessage.edit(
+        embeds
+          .race(game.userOne, game.userTwo)
+          .setTitle(`Race Lost`)
+          .setDescription(
+            `Sadly, you lost the race to **${
+              winnerData.racerDisplayName
+            }** by \`${loserData.ticksTaken - winnerData.ticksTaken}\` seconds.`
+          )
+          .addField(
+            `Rewards`,
+            `**Credits** $${commafy(loserCredits)}
+          **Experience** ${commafy(loserExperience)}`,
+            true
+          )
+      );
     }
-
-    const winnerUser = await client.users.fetch(winnerData.racerId);
-    winnerUser.send(
-      embeds.normal(
-        `Race Won`,
-        `You beat **${loserData.racerDisplayName}** by \`${
-          loserData.ticksTaken - winnerData.ticksTaken
-        }\` seconds. You've been rewarded with **${creditsWon} credits** and **${experienceWon} experience**!`
-      )
-    );
-
-    const loserUser = await client.users.fetch(loserData.racerId);
-    loserUser.send(
-      embeds.normal(
-        `Race Lost`,
-        `Sadly you have lost the race to **${
-          winnerData.racerDisplayName
-        }** by \`${loserData.ticksTaken - winnerData.ticksTaken}\` seconds.`
-      )
-    );
   } catch (err) {
     await game.deleteOne();
     console.log(err);
   }
-
-  // First find the winner of the game
-  // 1: Find the amount of ticks taken to win the race
-  // 2: The less amount of ticks the higher the price
-  // 3: The prize cannot go above 1k or 5k
-  // 4: Message the winner what they receive as a reward
 }

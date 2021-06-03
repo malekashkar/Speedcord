@@ -1,6 +1,6 @@
 import cars from "../cars";
 import embeds from "./embeds";
-import Configuration from "../config";
+import config from "../config";
 
 import { carTable } from ".";
 import { CarModel } from "../models/car";
@@ -23,7 +23,7 @@ export async function createSignupProcess(channel: TextChannel, author: User) {
       (reaction.emoji.name === "🟢" || reaction.emoji.name === "🔴"),
     {
       max: 1,
-      time: Configuration.questionTime,
+      time: config.questionTime,
     }
   );
 
@@ -39,7 +39,7 @@ export async function createSignupProcess(channel: TextChannel, author: User) {
       return channel.send(
         embeds.normal(
           `Sign-Up Process Ended`,
-          `If you would like to sign up in the future, simply use the \`${Configuration.prefix}play\` command again.`
+          `If you would like to sign up in the future, simply use the \`${config.prefix}play\` command again.`
         )
       );
     }
@@ -58,7 +58,7 @@ export async function createUsernameProcess(
     (m: Message) => m.author.id === author.id,
     {
       max: 1,
-      time: Configuration.questionTime,
+      time: config.questionTime,
     }
   );
 
@@ -109,11 +109,11 @@ export async function pickCarProcess(
 ) {
   const baseCars = cars
     .filter(
-      (car) => car.price <= Configuration.gameConfiguration.baseCarsMaxPrice
+      (car) => car.price <= config.gameConfiguration.baseCarsMaxPrice
     )
     .slice(0, 3)
     .map((car, index) => {
-      car.carName = `${Configuration.numberEmojis[index]} ${car.carName}`;
+      car.carName = `${config.numberEmojis[index]} ${car.carName}`;
       return car;
     });
 
@@ -125,18 +125,18 @@ export async function pickCarProcess(
   );
 
   for (let i = 0; i < baseCars.length; i++) {
-    await carQuestion.react(Configuration.numberEmojis[i]);
+    await carQuestion.react(config.numberEmojis[i]);
   }
 
   const baseCarCollector = carQuestion.createReactionCollector(
     (reaction: MessageReaction, user: User) =>
       user.id === author.id &&
-      Configuration.numberEmojis
+      config.numberEmojis
         .slice(0, baseCars.length)
         .includes(reaction.emoji.name),
     {
       max: 1,
-      time: Configuration.questionTime,
+      time: config.questionTime,
     }
   );
 
@@ -146,7 +146,7 @@ export async function pickCarProcess(
     const emoji = collected?.first()?.emoji?.name;
     if (!emoji) return;
 
-    const car = baseCars[Configuration.numberEmojis.indexOf(emoji)];
+    const car = baseCars[config.numberEmojis.indexOf(emoji)];
 
     await RacerModel.create({
       userId: author.id,

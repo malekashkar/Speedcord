@@ -1,5 +1,4 @@
 import { stripIndents } from "common-tags";
-import { EmbedFieldData } from "discord.js";
 import { Message } from "discord.js";
 import Command from ".";
 import cars from "../cars";
@@ -12,6 +11,7 @@ import Paginator from "../utils/paginator";
 export default class GarageCommand extends Command {
   cmdName = "garage";
   description = "See your current cars and other customizable.";
+  aliases = ["cars"];
 
   async run(message: Message, args: string[]) {
     const page = !isNaN(parseInt(args[0])) ? parseInt(args[0]) : 0;

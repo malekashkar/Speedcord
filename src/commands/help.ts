@@ -1,6 +1,6 @@
 import { Message } from "discord.js";
 import Command from ".";
-import Configuration from "../config";
+import config from "../config";
 import embeds from "../utils/embeds";
 
 export default class HelpCommand extends Command {
@@ -11,7 +11,7 @@ export default class HelpCommand extends Command {
     const formattedCommands = this.client.commands
       .array()
       .map((command, i) => {
-        const commandName = `\`${Configuration.prefix}${command.cmdName
+        const commandName = `\`${config.prefix}${command.cmdName
           .toString()
           .padEnd(8)}\``;
         if (i % 2 == 0) {
@@ -24,7 +24,7 @@ export default class HelpCommand extends Command {
     const helpEmbed = embeds
       .normal(`📚 Help Menu`, formattedCommands)
       .setFooter(
-        `Run the ${Configuration.prefix}info command for further help!`
+        `Run the ${config.prefix}info command for further help!`
       );
     return message.channel.send(helpEmbed);
   }

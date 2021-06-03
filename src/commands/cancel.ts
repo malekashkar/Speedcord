@@ -1,6 +1,6 @@
 import { Message } from "discord.js";
 import Command from ".";
-import Configuration from "../config";
+import config from "../config";
 import { GameModel } from "../models/game";
 import embeds from "../utils/embeds";
 
@@ -41,7 +41,7 @@ export default class CancelCommand extends Command {
       } else {
         return message.channel.send(
           embeds.error(
-            `You aren't in a race currently, you may join or start one using the \`${Configuration.prefix}play\` command.`
+            `You aren't in a race currently, you may join or start one using the \`${config.prefix}play\` command.`
           )
         );
       }

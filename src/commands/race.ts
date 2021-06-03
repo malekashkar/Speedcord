@@ -8,7 +8,7 @@ import embeds from "../utils/embeds";
 import { playGame, searchForGame, joinRace } from "../utils/gameFunction";
 import { sleep } from "../utils";
 import cars from "../cars";
-import Configuration from "../config";
+import config from "../config";
 
 export default class PlayCommand extends Command {
   cmdName = "race";
@@ -54,7 +54,7 @@ export default class PlayCommand extends Command {
     if (!carDetails)
       return loadingMesage.edit(
         embeds.error(
-          `Please select a car from your garage with the \`${Configuration.prefix}select\` command!`
+          `Please select a car from your garage with the \`${config.prefix}select\` command!`
         )
       );
 

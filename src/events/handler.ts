@@ -2,6 +2,9 @@ import logger from "../utils/logger";
 import { Message, TextChannel } from "discord.js";
 import Event, { EventNameType } from ".";
 import config from "../config";
+import { config as dotenv } from "dotenv";
+
+dotenv();
 
 export default class CommandHandler extends Event {
   eventName: EventNameType = "message";
@@ -11,7 +14,10 @@ export default class CommandHandler extends Event {
       return;
 
     try {
-      const prefix = config.prefix.toLowerCase();
+      const prefix =
+        process.env.NODE_ENV === "production"
+          ? config.prefix.toLowerCase()
+          : config.testingPrefix.toLowerCase();
       if (!prefix || message.content.toLowerCase().indexOf(prefix) !== 0)
         return;
 
