@@ -9,9 +9,11 @@ export class ArchivedGame {
   userTwo: RacerState;
 
   get places() {
-    if (this.userOne.ticksTaken < this.userTwo.ticksTaken) {
+    if (this.userOne.ticksTaken === this.userTwo.ticksTaken) {
+      return null;
+    } else if (this.userOne.ticksTaken < this.userTwo.ticksTaken) {
       return [this.userOne, this.userTwo];
-    } else {
+    } else if (this.userOne.ticksTaken > this.userTwo.ticksTaken) {
       return [this.userTwo, this.userOne];
     }
   }

@@ -5,10 +5,10 @@ import { createSignupProcess } from "../utils/signup";
 import { GameModel } from "../models/game";
 import { Racer, RacerModel } from "../models/racer";
 import embeds from "../utils/embeds";
-import { playGame, searchForGame, joinRace } from "../utils/gameFunction";
 import { sleep } from "../utils";
 import cars from "../cars";
 import config from "../config";
+import { Games, startMatchMaking } from "../utils/game";
 
 export default class PlayCommand extends Command {
   cmdName = "race";
@@ -58,7 +58,7 @@ export default class PlayCommand extends Command {
         )
       );
 
-    const raceGame = await searchForGame(message.author, racerProfile);
+    const raceGame = await startMatchMaking(message.author, racerProfile.experience);
     if (raceGame) {
       await sleep(1500);
       await loadingMesage.edit(
@@ -79,7 +79,9 @@ export default class PlayCommand extends Command {
         carName: carDetails.carName,
       };
 
-      return joinRace(message.channel as TextChannel, this.client, raceGame);
+      const createdRace = new Games(raceGame, this.client);
+      this.client.races.push(createdRace);
+      return createdRace.joinRace(message.channel as TextChannel);
     } else {
       await GameModel.create({
         createdAt: new Date(),
