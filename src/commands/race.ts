@@ -58,10 +58,7 @@ export default class PlayCommand extends Command {
         )
       );
 
-    const raceGame = await startMatchMaking(
-      message.author,
-      racerProfile.experience
-    );
+    const raceGame = await startMatchMaking(message.author, racerProfile.experience);
     if (raceGame) {
       await sleep(1500);
       await loadingMesage.edit(
@@ -82,13 +79,9 @@ export default class PlayCommand extends Command {
         carName: carDetails.carName,
       };
 
-      const createdRate = new Games();
-      createdRate.joinRace(
-        message.channel as TextChannel,
-        this.client,
-        raceGame
-      );
-      this.client.races.push(createdRate);
+      const createdRace = new Games(raceGame, this.client);
+      this.client.races.push(createdRace);
+      return createdRace.joinRace(message.channel as TextChannel);
     } else {
       await GameModel.create({
         createdAt: new Date(),

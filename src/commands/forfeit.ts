@@ -23,6 +23,9 @@ export default class ForfeitCommand extends Command {
 
     for (const race of races) {
       await race.deleteOne();
+
+      // Delete the races from this.client.races[]
+      // Edit the race messages saying its a forfeit
       // Give the reward to the winner
     }
 

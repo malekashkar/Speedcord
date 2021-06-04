@@ -41,6 +41,16 @@ export class Game {
 
   @prop({ type: RacerState })
   userTwo?: RacerState;
+
+  get places() {
+    if (this.userOne.ticksTaken === this.userTwo.ticksTaken) {
+      return null;
+    } else if (this.userOne.ticksTaken < this.userTwo.ticksTaken) {
+      return [this.userOne, this.userTwo];
+    } else if (this.userOne.ticksTaken > this.userTwo.ticksTaken) {
+      return [this.userTwo, this.userOne];
+    }
+  }
 }
 
 export const GameModel = getModelForClass(Game);

@@ -5,7 +5,7 @@ import Client from "..";
 import config from "../config";
 import Configuration from "../config";
 import { ArchivedGameModel } from "../models/archivedGame";
-import { Game, GameModel, RacerState } from "../models/game";
+import { Game, GameModel } from "../models/game";
 import { RacerModel } from "../models/racer";
 import embeds from "./embeds";
 
@@ -43,32 +43,39 @@ export async function startMatchMaking(
 }
 
 export default class Games {
-  lastMessageUpdateTime: number;
-  gameInformation: Game;
+  client: Client;
+  gameDocument: DocumentType<Game>;
 
-  async joinRace(
-    beginChannel: TextChannel,
-    client: Client,
-    game: DocumentType<Game>
-  ) {
+  lastMessageUpdate: number = Date.now();
+
+  constructor(document: DocumentType<Game>, client: Client) {
+    this.gameDocument = document;
+    this.client = client;
+  }
+
+  async joinRace(beginChannel: TextChannel) {
     try {
-      const userOne = await client.users.fetch(game.userOne.racerId);
-      const userTwo = await client.users.fetch(game.userTwo.racerId);
+      const userOne = await this.client.users.fetch(
+        this.gameDocument.userOne.racerId
+      );
+      const userTwo = await this.client.users.fetch(
+        this.gameDocument.userTwo.racerId
+      );
 
       const userOneMessage = await userOne.send(
-        embeds.race(game.userOne, game.userTwo)
+        embeds.race(this.gameDocument.userOne, this.gameDocument.userTwo)
       );
-      game.userOne.messageId = userOneMessage.id;
+      this.gameDocument.userOne.messageId = userOneMessage.id;
 
       const userTwoMessage = await userTwo.send(
-        embeds.race(game.userOne, game.userTwo)
+        embeds.race(this.gameDocument.userOne, this.gameDocument.userTwo)
       );
-      game.userTwo.messageId = userTwoMessage.id;
+      this.gameDocument.userTwo.messageId = userTwoMessage.id;
 
-      await game.save();
-      return this.playRace(client, game);
+      await this.gameDocument.save();
+      return this.playRace();
     } catch (err) {
-      await game.deleteOne();
+      await this.gameDocument.deleteOne();
       console.log(err);
       beginChannel.send(
         embeds.normal(
@@ -79,11 +86,11 @@ export default class Games {
     }
   }
 
-  async playRace(client: Client, game: DocumentType<Game>) {
+  async playRace() {
     try {
       const userOneGearShifts = Math.round(
         ((config.gameConfiguration.totalRaceHorsepower /
-          game.userOne.carBaseSpeed) *
+          this.gameDocument.userOne.carBaseSpeed) *
           5) /
           6 /
           6
@@ -91,182 +98,219 @@ export default class Games {
 
       const userTwoGearShifts = Math.round(
         ((config.gameConfiguration.totalRaceHorsepower /
-          game.userTwo.carBaseSpeed) *
+          this.gameDocument.userTwo.carBaseSpeed) *
           5) /
           6 /
           6
       );
-
-      const userOne = await client.users.fetch(game.userOne.racerId);
-      const userTwo = await client.users.fetch(game.userTwo.racerId);
+      
+      const userOne = await this.client.users.fetch(
+        this.gameDocument.userOne.racerId
+      );
+      const userTwo = await this.client.users.fetch(
+        this.gameDocument.userTwo.racerId
+      );
 
       const userOneMessage = await userOne.dmChannel.messages.fetch(
-        game.userOne.messageId
+        this.gameDocument.userOne.messageId
       );
       const userTwoMessage = await userTwo.dmChannel.messages.fetch(
-        game.userTwo.messageId
+        this.gameDocument.userTwo.messageId
       );
 
       let someoneWon = false;
       const updateScoreInterval = setInterval(async () => {
         if (
-          game.userOne.horsepowerCompleted <
-          config.gameConfiguration.totalRaceHorsepower
+          this.gameDocument.userOne.horsepowerCompleted <
+          Configuration.gameConfiguration.totalRaceHorsepower
         ) {
-          game.userOne.ticksTaken += 1;
-          game.userOne.horsepowerCompleted += game.userOne.carBaseSpeed;
+          this.gameDocument.userOne.ticksTaken += 1;
+          this.gameDocument.userOne.horsepowerCompleted +=
+            this.gameDocument.userOne.carBaseSpeed;
         }
 
         if (
-          game.userTwo.horsepowerCompleted <
-          config.gameConfiguration.totalRaceHorsepower
+          this.gameDocument.userTwo.horsepowerCompleted <
+          Configuration.gameConfiguration.totalRaceHorsepower
         ) {
-          game.userTwo.ticksTaken += 1;
-          game.userTwo.horsepowerCompleted += game.userTwo.carBaseSpeed;
+          this.gameDocument.userTwo.ticksTaken += 1;
+          this.gameDocument.userTwo.horsepowerCompleted +=
+            this.gameDocument.userTwo.carBaseSpeed;
         }
 
         if (
-          game.userOne.horsepowerCompleted >=
-            config.gameConfiguration.totalRaceHorsepower ||
-          (game.userTwo.horsepowerCompleted >=
-            config.gameConfiguration.totalRaceHorsepower &&
-            !someoneWon)
+          (this.gameDocument.userOne.horsepowerCompleted >=
+            Configuration.gameConfiguration.totalRaceHorsepower ||
+            this.gameDocument.userTwo.horsepowerCompleted >=
+              Configuration.gameConfiguration.totalRaceHorsepower) &&
+          !someoneWon
         ) {
           // Someone won the race
-          userOneMessage.edit(embeds.race(game.userOne, game.userTwo));
-          userTwoMessage.edit(embeds.race(game.userOne, game.userTwo));
+          userOneMessage.edit(
+            embeds.race(this.gameDocument.userOne, this.gameDocument.userTwo)
+          );
+          userTwoMessage.edit(
+            embeds.race(this.gameDocument.userOne, this.gameDocument.userTwo)
+          );
           someoneWon = true;
-        }
-
-        if (
-          game.userOne.horsepowerCompleted >=
-            config.gameConfiguration.totalRaceHorsepower &&
-          game.userTwo.horsepowerCompleted >=
-            config.gameConfiguration.totalRaceHorsepower &&
+        } else if (
+          this.gameDocument.userOne.horsepowerCompleted >=
+            Configuration.gameConfiguration.totalRaceHorsepower &&
+          this.gameDocument.userTwo.horsepowerCompleted >=
+            Configuration.gameConfiguration.totalRaceHorsepower &&
           someoneWon
         ) {
           // Game completely ended, move to archived
-          this.endRace(client, game);
+          this.endRace();
           clearInterval(updateScoreInterval);
-        }
-
-        if (this.lastMessageUpdateTime - new Date().getTime() >= 3000) {
+        } else if (Date.now() - this.lastMessageUpdate >= 5000) {
           // Neither user won, just update the race positions
-          userOneMessage.edit(embeds.race(game.userOne, game.userTwo));
-          userTwoMessage.edit(embeds.race(game.userOne, game.userTwo));
-          this.lastMessageUpdateTime = new Date().getTime();
+          userOneMessage.edit(
+            embeds.race(this.gameDocument.userOne, this.gameDocument.userTwo)
+          );
+          userTwoMessage.edit(
+            embeds.race(this.gameDocument.userOne, this.gameDocument.userTwo)
+          );
         }
       }, 1000);
     } catch (err) {
-      await game.deleteOne();
+      await this.gameDocument.deleteOne();
       console.log(err);
     }
   }
 
-  async endRace(client: Client, game: DocumentType<Game>) {
+  async endRace() {
     try {
-      await ArchivedGameModel.create({
-        userOne: game.userOne,
-        userTwo: game.userTwo,
+      const userOne = await this.client.users.fetch(
+        this.gameDocument.userOne.racerId
+      );
+      const userOneMessage = await userOne.dmChannel.messages.fetch(
+        this.gameDocument.userOne.messageId
+      );
+      const userOneProfile = await RacerModel.findOne({
+        userId: this.gameDocument.userOne.racerId,
       });
-      await game.deleteOne();
 
-      if (game.userOne.ticksTaken === game.userTwo.ticksTaken) {
+      const userTwo = await this.client.users.fetch(
+        this.gameDocument.userTwo.racerId
+      );
+      const userTwoMessage = await userTwo.dmChannel.messages.fetch(
+        this.gameDocument.userTwo.messageId
+      );
+      const userTwoProfile = await RacerModel.findOne({
+        userId: this.gameDocument.userTwo.racerId,
+      });
+
+      const racerPlaces = this.gameDocument.places;
+      if (!racerPlaces) {
+        // User One
+        if (userOneProfile) {
+          userOneProfile.credits += config.gameConfiguration.creditsTieReward;
+          userOneProfile.experience +=
+            config.gameConfiguration.experienceTieReward;
+          await userOneProfile.save();
+        }
+
+        // User Two
+        if (userTwoProfile) {
+          userTwoProfile.credits += config.gameConfiguration.creditsTieReward;
+          userTwoProfile.experience +=
+            config.gameConfiguration.experienceTieReward;
+          await userTwoProfile.save();
+        }
       } else {
         // Winner Information
-        const winnerData =
-          game.userOne.ticksTaken < game.userTwo.ticksTaken
-            ? game.userOne
-            : game.userTwo;
-
         const winnerCredits = Math.round(
-          config.gameConfiguration.coinsWinDefault - winnerData.ticksTaken * 8
+          config.gameConfiguration.creditsWinDefault -
+            racerPlaces[0].ticksTaken * 8
         );
         const winnerExperience = Math.round(
           config.gameConfiguration.experienceWinDefault -
-            winnerData.ticksTaken * 40
+            racerPlaces[0].ticksTaken * 40
         );
-
-        const winnerProfile = await RacerModel.findOne({
-          userId: winnerData.racerId,
-        });
-        if (winnerProfile) {
-          winnerProfile.credits += winnerCredits;
-          winnerProfile.experience += winnerExperience;
-          await winnerProfile.save();
-        }
+        const winnerEmbed = embeds
+          .race(this.gameDocument.userOne, this.gameDocument.userTwo)
+          .setTitle(`Race Won`)
+          .setDescription(
+            `🎉 You beat **${racerPlaces[1].racerDisplayName}** by \`${
+              racerPlaces[1].ticksTaken - racerPlaces[0].ticksTaken
+            }\` seconds.`
+          )
+          .addField(
+            `Rewards`,
+            `**Credits** $${commafy(winnerCredits)}
+      **Experience** ${commafy(winnerExperience)}`,
+            true
+          );
 
         // Loser Information
-        const loserData =
-          game.userOne.ticksTaken < game.userTwo.ticksTaken
-            ? game.userTwo
-            : game.userOne;
-
         const loserCredits = Math.round(
-          config.gameConfiguration.coinsLossDefault - loserData.ticksTaken * 0.9
+          config.gameConfiguration.creditsLossDefault -
+            racerPlaces[1].ticksTaken * 0.9
         );
         const loserExperience = Math.round(
           config.gameConfiguration.experienceLossDefault -
-            loserData.ticksTaken * 9
+            racerPlaces[1].ticksTaken * 9
         );
+        const loserEmbed = embeds
+          .race(this.gameDocument.userOne, this.gameDocument.userTwo)
+          .setTitle(`Race Lost`)
+          .setDescription(
+            `Sadly, you lost the race to **${
+              racerPlaces[0].racerDisplayName
+            }** by \`${
+              racerPlaces[1].ticksTaken - racerPlaces[0].ticksTaken
+            }\` seconds.`
+          )
+          .addField(
+            `Rewards`,
+            `**Credits** $${commafy(loserCredits)}
+      **Experience** ${commafy(loserExperience)}`,
+            true
+          );
 
-        const loserProfile = await RacerModel.findOne({
-          userId: loserData.racerId,
-        });
-        if (loserProfile) {
-          loserProfile.credits += loserCredits;
-          loserProfile.experience += loserExperience;
-          await loserProfile.save();
+        if (racerPlaces[0].racerId === userOne.id) {
+          // User One Winner
+          if (userOneProfile) {
+            userOneProfile.credits += winnerCredits;
+            userOneProfile.experience += winnerExperience;
+            await userOneProfile.save();
+          }
+          userOneMessage.edit(winnerEmbed);
+
+          // User Two Loser
+          if (userTwoProfile) {
+            userTwoProfile.credits += loserCredits;
+            userTwoProfile.experience += loserExperience;
+            await userTwoProfile.save();
+          }
+          userTwoMessage.edit(loserEmbed);
+        } else {
+          // User One Loser
+          if (userOneProfile) {
+            userOneProfile.credits += loserCredits;
+            userOneProfile.experience += loserExperience;
+            await userOneProfile.save();
+          }
+          userOneMessage.edit(loserEmbed);
+
+          // User Two Winner
+          if (userTwoProfile) {
+            userTwoProfile.credits += loserCredits;
+            userTwoProfile.experience += loserExperience;
+            await userTwoProfile.save();
+          }
+          userTwoMessage.edit(winnerEmbed);
         }
-
-        // Winner Message
-        const winnerUser = await client.users.fetch(winnerData.racerId);
-        const winnerMessage = await winnerUser.dmChannel.messages.fetch(
-          winnerData.messageId
-        );
-        winnerMessage.edit(
-          embeds
-            .race(game.userOne, game.userTwo)
-            .setTitle(`Race Won`)
-            .setDescription(
-              `🎉 You beat **${loserData.racerDisplayName}** by \`${
-                loserData.ticksTaken - winnerData.ticksTaken
-              }\` seconds.`
-            )
-            .addField(
-              `Rewards`,
-              `**Credits** $${commafy(winnerCredits)}
-            **Experience** ${commafy(winnerExperience)}`,
-              true
-            )
-        );
-
-        // Loser Message
-        const loserUser = await client.users.fetch(loserData.racerId);
-        const loserMessage = await loserUser.dmChannel.messages.fetch(
-          loserData.messageId
-        );
-        loserMessage.edit(
-          embeds
-            .race(game.userOne, game.userTwo)
-            .setTitle(`Race Lost`)
-            .setDescription(
-              `Sadly, you lost the race to **${
-                winnerData.racerDisplayName
-              }** by \`${
-                loserData.ticksTaken - winnerData.ticksTaken
-              }\` seconds.`
-            )
-            .addField(
-              `Rewards`,
-              `**Credits** $${commafy(loserCredits)}
-            **Experience** ${commafy(loserExperience)}`,
-              true
-            )
-        );
       }
+
+      await ArchivedGameModel.create({
+        userOne: this.gameDocument.userOne,
+        userTwo: this.gameDocument.userTwo,
+      });
+      await this.gameDocument.deleteOne();
     } catch (err) {
-      await game.deleteOne();
+      await this.gameDocument.deleteOne();
       console.log(err);
     }
   }

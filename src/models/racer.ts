@@ -18,6 +18,10 @@ export class Racer {
 
   @prop({ default: 0 })
   experience?: number;
+
+  get level() {
+    return this.experience / 1000;
+  }
 }
 
 export const RacerModel = getModelForClass(Racer);
