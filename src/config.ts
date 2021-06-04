@@ -32,7 +32,7 @@ export default {
 
   gameConfiguration: {
     baseCarsMaxPrice: 50000,
-    queueExperienceDiversion: 5000, // Set to 0 to turn off skillbased matchmaking
+    queueExperienceDiversion: 0, // Set to 0 to turn off skillbased matchmaking
     totalRaceHorsepower: 10000,
 
     creditsWinDefault: 1000,

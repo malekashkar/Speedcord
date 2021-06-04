@@ -1,6 +1,6 @@
 import { Message } from "discord.js";
 import Command from ".";
-import { RacerModel } from "../models/racer";
+import { GameModel } from "../models/game";
 import embeds from "../utils/embeds";
 
 export default class ForfeitCommand extends Command {
@@ -8,11 +8,13 @@ export default class ForfeitCommand extends Command {
   description = "Not doing so well? Drop the race whenever you need.";
 
   async run(message: Message) {
-    const races = await RacerModel.find({
+    const races = await GameModel.find({
       $or: [
         { "userOne.racerId": message.author.id },
         { "userTwo.racerId": message.author.id },
       ],
+      userOne: { $exists: true },
+      userTwo: { $exists: true },
     });
     if (!races.length)
       return message.channel.send(
@@ -22,11 +24,8 @@ export default class ForfeitCommand extends Command {
       );
 
     for (const race of races) {
-      await race.deleteOne();
-
-      // Delete the races from this.client.races[]
-      // Edit the race messages saying its a forfeit
-      // Give the reward to the winner
+      const localRace = this.client.races.get(race.userOne.racerId);
+      if (localRace) localRace.endRace(message.author.id);
     }
 
     return message.channel.send(

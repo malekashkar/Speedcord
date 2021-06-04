@@ -8,13 +8,13 @@ import fs from "fs";
 import Event from "./events";
 import Command from "./commands";
 import Logger from "./utils/logger";
-import { Games } from "./utils/game";
+import Games from "./utils/game";
 
 dotenv();
 
 export default class Client extends DiscordClient {
   commands: Collection<string, Command> = new Collection();
-  races: Games[] = [];
+  races: Collection<string, Games> = new Collection();
 
   constructor(options?: ClientOptions) {
     super({
@@ -26,6 +26,8 @@ export default class Client extends DiscordClient {
           "GUILD_MESSAGES",
           "GUILD_MESSAGE_REACTIONS",
           "GUILD_VOICE_STATES",
+          "DIRECT_MESSAGES",
+          "DIRECT_MESSAGE_REACTIONS",
         ],
       },
     });

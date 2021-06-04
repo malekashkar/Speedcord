@@ -26,7 +26,7 @@ export default class ShopCommand extends Command {
           return {
             name: carDetails.carName,
             value: stripIndents`**Horsepower** ${commafy(carDetails.baseSpeed)}
-            **Price** $${commafy(carDetails.price)}`,
+            **Price** ${commafy(carDetails.price)}`,
             inline: true,
           };
         });

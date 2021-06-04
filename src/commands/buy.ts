@@ -7,6 +7,7 @@ import config from "../config";
 import { Racer, RacerModel } from "../models/racer";
 import { CarModel } from "../models/car";
 import { DocumentType } from "@typegoose/typegoose";
+import Paginator from "../utils/paginator";
 
 export default class BuyCommand extends Command {
   cmdName = "buy";
@@ -95,6 +96,15 @@ async function checkoutProcess(
   racerProfile: DocumentType<Racer>,
   channel: TextChannel
 ) {
+  const duplicateCar = await CarModel.findOne({
+    racerId: racerProfile.userId,
+    carId: chosenCar.carId,
+  });
+  if (duplicateCar)
+    return channel.send(
+      embeds.error(`You may not purchase duplicate cars, sorry!`)
+    );
+
   if (chosenCar.price > racerProfile.credits)
     return channel.send(
       embeds.error(

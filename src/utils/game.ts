@@ -1,9 +1,10 @@
 import { DocumentType } from "@typegoose/typegoose";
+import { stripIndents } from "common-tags";
+import { clear } from "console";
 import { TextChannel, User } from "discord.js";
 import { commafy } from ".";
 import Client from "..";
 import config from "../config";
-import Configuration from "../config";
 import { ArchivedGameModel } from "../models/archivedGame";
 import { Game, GameModel } from "../models/game";
 import { RacerModel } from "../models/racer";
@@ -15,17 +16,23 @@ export async function startMatchMaking(
   availableGames?: DocumentType<Game>[]
 ): Promise<DocumentType<Game>> | null {
   if (!availableGames?.length) {
-    availableGames = await GameModel.find({
-      status: "CREATED",
-      "userOne.racerId": { $ne: author.id },
-      "userOne.racerExperience": {
-        $gte:
-          experience - Configuration.gameConfiguration.queueExperienceDiversion,
-        $lte:
-          experience + Configuration.gameConfiguration.queueExperienceDiversion,
-      },
-      userTwo: { $exists: false },
-    });
+    if (config.gameConfiguration.queueExperienceDiversion) {
+      availableGames = await GameModel.find({
+        status: "CREATED",
+        "userOne.racerId": { $ne: author.id },
+        "userOne.racerExperience": {
+          $gte: experience - config.gameConfiguration.queueExperienceDiversion,
+          $lte: experience + config.gameConfiguration.queueExperienceDiversion,
+        },
+        userTwo: { $exists: false },
+      });
+    } else {
+      availableGames = await GameModel.find({
+        status: "CREATED",
+        "userOne.racerId": { $ne: author.id },
+        userTwo: { $exists: false },
+      });
+    }
     if (!availableGames) return null;
   }
 
@@ -43,14 +50,21 @@ export async function startMatchMaking(
 }
 
 export default class Games {
+  ended: boolean = false;
+  lastMessageUpdate: number = Date.now();
+
   client: Client;
   gameDocument: DocumentType<Game>;
 
-  lastMessageUpdate: number = Date.now();
+  gameInterval: NodeJS.Timeout;
 
   constructor(document: DocumentType<Game>, client: Client) {
     this.gameDocument = document;
     this.client = client;
+  }
+
+  endInterval() {
+    clearInterval(this.gameInterval);
   }
 
   async joinRace(beginChannel: TextChannel) {
@@ -103,7 +117,7 @@ export default class Games {
           6 /
           6
       );
-      
+
       const userOne = await this.client.users.fetch(
         this.gameDocument.userOne.racerId
       );
@@ -119,10 +133,10 @@ export default class Games {
       );
 
       let someoneWon = false;
-      const updateScoreInterval = setInterval(async () => {
+      this.gameInterval = setInterval(async () => {
         if (
           this.gameDocument.userOne.horsepowerCompleted <
-          Configuration.gameConfiguration.totalRaceHorsepower
+          config.gameConfiguration.totalRaceHorsepower
         ) {
           this.gameDocument.userOne.ticksTaken += 1;
           this.gameDocument.userOne.horsepowerCompleted +=
@@ -131,7 +145,7 @@ export default class Games {
 
         if (
           this.gameDocument.userTwo.horsepowerCompleted <
-          Configuration.gameConfiguration.totalRaceHorsepower
+          config.gameConfiguration.totalRaceHorsepower
         ) {
           this.gameDocument.userTwo.ticksTaken += 1;
           this.gameDocument.userTwo.horsepowerCompleted +=
@@ -140,9 +154,9 @@ export default class Games {
 
         if (
           (this.gameDocument.userOne.horsepowerCompleted >=
-            Configuration.gameConfiguration.totalRaceHorsepower ||
+            config.gameConfiguration.totalRaceHorsepower ||
             this.gameDocument.userTwo.horsepowerCompleted >=
-              Configuration.gameConfiguration.totalRaceHorsepower) &&
+              config.gameConfiguration.totalRaceHorsepower) &&
           !someoneWon
         ) {
           // Someone won the race
@@ -155,14 +169,13 @@ export default class Games {
           someoneWon = true;
         } else if (
           this.gameDocument.userOne.horsepowerCompleted >=
-            Configuration.gameConfiguration.totalRaceHorsepower &&
+            config.gameConfiguration.totalRaceHorsepower &&
           this.gameDocument.userTwo.horsepowerCompleted >=
-            Configuration.gameConfiguration.totalRaceHorsepower &&
+            config.gameConfiguration.totalRaceHorsepower &&
           someoneWon
         ) {
           // Game completely ended, move to archived
           this.endRace();
-          clearInterval(updateScoreInterval);
         } else if (Date.now() - this.lastMessageUpdate >= 5000) {
           // Neither user won, just update the race positions
           userOneMessage.edit(
@@ -179,8 +192,11 @@ export default class Games {
     }
   }
 
-  async endRace() {
+  async endRace(forfeiterId?: string) {
+    this.endInterval();
+
     try {
+      // User One Information
       const userOne = await this.client.users.fetch(
         this.gameDocument.userOne.racerId
       );
@@ -191,6 +207,7 @@ export default class Games {
         userId: this.gameDocument.userOne.racerId,
       });
 
+      // User Two Information
       const userTwo = await this.client.users.fetch(
         this.gameDocument.userTwo.racerId
       );
@@ -201,106 +218,191 @@ export default class Games {
         userId: this.gameDocument.userTwo.racerId,
       });
 
+      // Complete the Race Ending Process
       const racerPlaces = this.gameDocument.places;
-      if (!racerPlaces) {
-        // User One
-        if (userOneProfile) {
-          userOneProfile.credits += config.gameConfiguration.creditsTieReward;
-          userOneProfile.experience +=
-            config.gameConfiguration.experienceTieReward;
-          await userOneProfile.save();
-        }
-
-        // User Two
-        if (userTwoProfile) {
-          userTwoProfile.credits += config.gameConfiguration.creditsTieReward;
-          userTwoProfile.experience +=
-            config.gameConfiguration.experienceTieReward;
-          await userTwoProfile.save();
-        }
-      } else {
-        // Winner Information
+      if (forfeiterId) {
+        const ticksTaken =
+          this.gameDocument.userOne.racerId === forfeiterId
+            ? config.gameConfiguration.totalRaceHorsepower /
+                this.gameDocument.userTwo.horsepowerCompleted +
+              this.gameDocument.userTwo.ticksTaken
+            : config.gameConfiguration.totalRaceHorsepower /
+                this.gameDocument.userOne.horsepowerCompleted +
+              this.gameDocument.userOne.ticksTaken;
         const winnerCredits = Math.round(
-          config.gameConfiguration.creditsWinDefault -
-            racerPlaces[0].ticksTaken * 8
+          config.gameConfiguration.creditsWinDefault - ticksTaken * 8
         );
         const winnerExperience = Math.round(
-          config.gameConfiguration.experienceWinDefault -
-            racerPlaces[0].ticksTaken * 40
+          config.gameConfiguration.experienceWinDefault - ticksTaken * 40
         );
+
+        const forfeiter =
+          this.gameDocument.userOne.racerId === forfeiterId
+            ? this.gameDocument.userOne
+            : this.gameDocument.userTwo;
+        const winner =
+          this.gameDocument.userOne.racerId === forfeiterId
+            ? this.gameDocument.userTwo
+            : this.gameDocument.userOne;
+
         const winnerEmbed = embeds
           .race(this.gameDocument.userOne, this.gameDocument.userTwo)
-          .setTitle(`Race Won`)
+          .setTitle(`Race Forfeited`)
           .setDescription(
-            `🎉 You beat **${racerPlaces[1].racerDisplayName}** by \`${
-              racerPlaces[1].ticksTaken - racerPlaces[0].ticksTaken
-            }\` seconds.`
+            `**${forfeiter.racerDisplayName}** forfeited the race against **${winner.racerDisplayName}**!`
           )
           .addField(
             `Rewards`,
-            `**Credits** $${commafy(winnerCredits)}
-      **Experience** ${commafy(winnerExperience)}`,
+            stripIndents`**Credits** ${commafy(winnerCredits)}
+              **Experience** ${commafy(winnerExperience)}`,
             true
           );
 
-        // Loser Information
-        const loserCredits = Math.round(
-          config.gameConfiguration.creditsLossDefault -
-            racerPlaces[1].ticksTaken * 0.9
-        );
-        const loserExperience = Math.round(
-          config.gameConfiguration.experienceLossDefault -
-            racerPlaces[1].ticksTaken * 9
-        );
-        const loserEmbed = embeds
+        const forfeiterEmbed = embeds
           .race(this.gameDocument.userOne, this.gameDocument.userTwo)
-          .setTitle(`Race Lost`)
+          .setTitle(`Race Forfeited`)
           .setDescription(
-            `Sadly, you lost the race to **${
-              racerPlaces[0].racerDisplayName
-            }** by \`${
-              racerPlaces[1].ticksTaken - racerPlaces[0].ticksTaken
-            }\` seconds.`
-          )
-          .addField(
-            `Rewards`,
-            `**Credits** $${commafy(loserCredits)}
-      **Experience** ${commafy(loserExperience)}`,
-            true
+            `**${forfeiter.racerDisplayName}** forfeited the race against **${winner.racerDisplayName}**!`
           );
 
-        if (racerPlaces[0].racerId === userOne.id) {
-          // User One Winner
+        if (this.gameDocument.userOne.racerId === forfeiterId) {
+          if (userTwoProfile) {
+            userTwoProfile.credits += winnerCredits;
+            userTwoProfile.experience += winnerExperience;
+            await userTwoProfile.save();
+          }
+          userOneMessage.edit(forfeiterEmbed);
+          userTwoMessage.edit(winnerEmbed);
+        } else {
           if (userOneProfile) {
             userOneProfile.credits += winnerCredits;
             userOneProfile.experience += winnerExperience;
             await userOneProfile.save();
           }
           userOneMessage.edit(winnerEmbed);
+          userTwoMessage.edit(forfeiterEmbed);
+        }
+        // Give the reward to the winner
+      } else {
+        if (!racerPlaces) {
+          const tieEmbed = embeds
+            .race(this.gameDocument.userOne, this.gameDocument.userTwo)
+            .setTitle(`Race Tied`)
+            .setDescription(
+              `The race ended in a tie between you and your opponent!`
+            )
+            .addField(
+              `Rewards`,
+              stripIndents`**Credits** ${commafy(
+                config.gameConfiguration.creditsTieReward
+              )}
+              **Experience** ${commafy(
+                config.gameConfiguration.experienceTieReward
+              )}`,
+              true
+            );
 
-          // User Two Loser
-          if (userTwoProfile) {
-            userTwoProfile.credits += loserCredits;
-            userTwoProfile.experience += loserExperience;
-            await userTwoProfile.save();
-          }
-          userTwoMessage.edit(loserEmbed);
-        } else {
-          // User One Loser
+          // User One
+          userOneMessage.edit(tieEmbed);
           if (userOneProfile) {
-            userOneProfile.credits += loserCredits;
-            userOneProfile.experience += loserExperience;
+            userOneProfile.credits += config.gameConfiguration.creditsTieReward;
+            userOneProfile.experience +=
+              config.gameConfiguration.experienceTieReward;
             await userOneProfile.save();
           }
-          userOneMessage.edit(loserEmbed);
 
-          // User Two Winner
+          // User Two
+          userTwoMessage.edit(tieEmbed);
           if (userTwoProfile) {
-            userTwoProfile.credits += loserCredits;
-            userTwoProfile.experience += loserExperience;
+            userTwoProfile.credits += config.gameConfiguration.creditsTieReward;
+            userTwoProfile.experience +=
+              config.gameConfiguration.experienceTieReward;
             await userTwoProfile.save();
           }
-          userTwoMessage.edit(winnerEmbed);
+        } else {
+          // Winner Information
+          const winnerCredits = Math.round(
+            config.gameConfiguration.creditsWinDefault -
+              racerPlaces[0].ticksTaken * 8
+          );
+          const winnerExperience = Math.round(
+            config.gameConfiguration.experienceWinDefault -
+              racerPlaces[0].ticksTaken * 40
+          );
+          const winnerEmbed = embeds
+            .race(this.gameDocument.userOne, this.gameDocument.userTwo)
+            .setTitle(`Race Won`)
+            .setDescription(
+              `🎉 You beat **${racerPlaces[1].racerDisplayName}** by \`${
+                racerPlaces[1].ticksTaken - racerPlaces[0].ticksTaken
+              }\` seconds.`
+            )
+            .addField(
+              `Rewards`,
+              `**Credits** ${commafy(winnerCredits)}
+        **Experience** ${commafy(winnerExperience)}`,
+              true
+            );
+
+          // Loser Information
+          const loserCredits = Math.round(
+            config.gameConfiguration.creditsLossDefault -
+              racerPlaces[1].ticksTaken * 0.9
+          );
+          const loserExperience = Math.round(
+            config.gameConfiguration.experienceLossDefault -
+              racerPlaces[1].ticksTaken * 9
+          );
+          const loserEmbed = embeds
+            .race(this.gameDocument.userOne, this.gameDocument.userTwo)
+            .setTitle(`Race Lost`)
+            .setDescription(
+              `Sadly, you lost the race to **${
+                racerPlaces[0].racerDisplayName
+              }** by \`${
+                racerPlaces[1].ticksTaken - racerPlaces[0].ticksTaken
+              }\` seconds.`
+            )
+            .addField(
+              `Rewards`,
+              `**Credits** ${commafy(loserCredits)}
+        **Experience** ${commafy(loserExperience)}`,
+              true
+            );
+
+          if (racerPlaces[0].racerId === userOne.id) {
+            // User One Winner
+            if (userOneProfile) {
+              userOneProfile.credits += winnerCredits;
+              userOneProfile.experience += winnerExperience;
+              await userOneProfile.save();
+            }
+            userOneMessage.edit(winnerEmbed);
+
+            // User Two Loser
+            if (userTwoProfile) {
+              userTwoProfile.credits += loserCredits;
+              userTwoProfile.experience += loserExperience;
+              await userTwoProfile.save();
+            }
+            userTwoMessage.edit(loserEmbed);
+          } else {
+            // User One Loser
+            if (userOneProfile) {
+              userOneProfile.credits += loserCredits;
+              userOneProfile.experience += loserExperience;
+              await userOneProfile.save();
+            }
+            userOneMessage.edit(loserEmbed);
+
+            // User Two Winner
+            if (userTwoProfile) {
+              userTwoProfile.credits += loserCredits;
+              userTwoProfile.experience += loserExperience;
+              await userTwoProfile.save();
+            }
+            userTwoMessage.edit(winnerEmbed);
+          }
         }
       }
 
@@ -309,6 +411,7 @@ export default class Games {
         userTwo: this.gameDocument.userTwo,
       });
       await this.gameDocument.deleteOne();
+      this.ended = true;
     } catch (err) {
       await this.gameDocument.deleteOne();
       console.log(err);

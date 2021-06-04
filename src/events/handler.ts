@@ -10,8 +10,7 @@ export default class CommandHandler extends Event {
   eventName: EventNameType = "message";
 
   async handle(message: Message) {
-    if (!(message.channel instanceof TextChannel) || message.author?.bot)
-      return;
+    if (message.author?.bot) return;
 
     try {
       const prefix =

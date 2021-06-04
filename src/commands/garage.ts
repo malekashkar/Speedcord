@@ -41,7 +41,7 @@ export default class GarageCommand extends Command {
           return {
             name: `${pageIndex * 6 + i + 1} ${carDetails.carName}`,
             value: stripIndents`**Horsepower** ${commafy(carDetails.baseSpeed)}
-            **Value** $${commafy(carDetails.price)}`,
+            **Value** ${commafy(carDetails.price)}`,
             inline: true,
           };
         });

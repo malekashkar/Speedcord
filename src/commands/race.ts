@@ -80,7 +80,7 @@ export default class PlayCommand extends Command {
       };
 
       const createdRace = new Games(raceGame, this.client);
-      this.client.races.push(createdRace);
+      this.client.races.set(raceGame.userOne.racerId, createdRace);
       return createdRace.joinRace(message.channel as TextChannel);
     } else {
       await GameModel.create({
