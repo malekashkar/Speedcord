@@ -1,8 +1,7 @@
 import { DocumentType } from "@typegoose/typegoose";
 import { stripIndents } from "common-tags";
-import { clear } from "console";
 import { TextChannel, User } from "discord.js";
-import { commafy } from ".";
+import { commafy, randomElementSelector } from ".";
 import Client from "..";
 import config from "../config";
 import { ArchivedGameModel } from "../models/archivedGame";
@@ -50,13 +49,13 @@ export async function startMatchMaking(
 }
 
 export default class Games {
-  ended: boolean = false;
-  lastMessageUpdate: number = Date.now();
-
   client: Client;
+  ended: boolean = false;
   gameDocument: DocumentType<Game>;
 
   gameInterval: NodeJS.Timeout;
+  userOneUpdateTime: number = Date.now();
+  userTwoUpdateTime: number = Date.now();
 
   constructor(document: DocumentType<Game>, client: Client) {
     this.gameDocument = document;
@@ -182,14 +181,39 @@ export default class Games {
         ) {
           // Game completely ended, move to archived
           this.endRace();
-        } else if (Date.now() - this.lastMessageUpdate >= 5000) {
+        } else {
           // Neither user won, just update the race positions
-          userOneMessage.edit(
-            embeds.race(this.gameDocument.userOne, this.gameDocument.userTwo)
-          );
-          userTwoMessage.edit(
-            embeds.race(this.gameDocument.userOne, this.gameDocument.userTwo)
-          );
+          if (Date.now() - this.userOneUpdateTime >= userOneGearInterval) {
+            await userOneMessage.reactions.removeAll();
+
+            userOneMessage.edit(
+              embeds.race(this.gameDocument.userOne, this.gameDocument.userTwo)
+            );
+
+            const correctShiftEmoji =
+              config.gearShiftsEmojis[
+                Math.floor(Math.random() * config.gearShiftsEmojis.length)
+              ];
+
+            let randomReactions = randomElementSelector(
+              config.gearShiftsEmojis,
+              5
+            );
+            if (!randomReactions.includes(correctShiftEmoji))
+              randomReactions = randomReactions
+                .slice(0, randomReactions.length - 1)
+                .concat([correctShiftEmoji]);
+
+            for (const emoji of randomReactions) {
+              userOneMessage.react(emoji);
+            }
+          }
+
+          if (Date.now() - this.userTwoUpdateTime >= userTwoGearInterval) {
+            userTwoMessage.edit(
+              embeds.race(this.gameDocument.userOne, this.gameDocument.userTwo)
+            );
+          }
         }
       }, 1000);
     } catch (err) {

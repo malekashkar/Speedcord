@@ -21,6 +21,7 @@ export interface config {
   };
 
   numberEmojis: string[];
+  gearShiftsEmojis: string[];
 }
 
 export default {

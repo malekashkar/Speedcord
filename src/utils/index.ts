@@ -21,3 +21,13 @@ export function sleep(ms: number) {
     setTimeout(resolve, ms);
   });
 }
+
+export function randomElementSelector(array: any[], amount: number = 1) {
+  if (array.length < amount) return null;
+  let tempArr: any[] = [];
+  while (tempArr.length < amount) {
+    const randomEl = array[Math.floor(Math.random() * array.length)];
+    if (!tempArr.includes(randomEl)) tempArr.push(randomEl);
+  }
+  return tempArr;
+}
