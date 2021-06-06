@@ -102,21 +102,27 @@ export default class Games {
 
   async playRace() {
     try {
-      const userOneGearShifts = Math.round(
-        ((config.gameConfiguration.totalRaceHorsepower /
-          this.gameDocument.userOne.carBaseSpeed) *
-          5) /
-          6 /
-          6
-      );
+      const userOneGearInterval =
+        config.gameConfiguration.totalRaceHorsepower /
+        this.gameDocument.userOne.carBaseSpeed /
+        Math.round(
+          ((config.gameConfiguration.totalRaceHorsepower /
+            this.gameDocument.userOne.carBaseSpeed) *
+            5) /
+            6 /
+            6
+        );
 
-      const userTwoGearShifts = Math.round(
-        ((config.gameConfiguration.totalRaceHorsepower /
-          this.gameDocument.userTwo.carBaseSpeed) *
-          5) /
-          6 /
-          6
-      );
+      const userTwoGearInterval =
+        config.gameConfiguration.totalRaceHorsepower /
+        this.gameDocument.userTwo.carBaseSpeed /
+        Math.round(
+          ((config.gameConfiguration.totalRaceHorsepower /
+            this.gameDocument.userTwo.carBaseSpeed) *
+            5) /
+            6 /
+            6
+        );
 
       const userOne = await this.client.users.fetch(
         this.gameDocument.userOne.racerId
